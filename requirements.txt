@@ -1,0 +1,8 @@
+streamlit
+openai
+requests
+python-dotenv  # Remove if not using dotenv anymore
+python-docx
+pytesseract
+pillow
+# Add any other packages from your app.py/pdf_utils.py
