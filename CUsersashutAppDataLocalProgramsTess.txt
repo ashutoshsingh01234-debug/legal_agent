@@ -1,0 +1,6 @@
+C:\Users\ashut\AppData\Local\Programs\Tesseract-OCR
+
+
+
+OPENAI_API_KEY = "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"
+PERPLEXITY_API_KEY = "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"
