@@ -1,16 +1,14 @@
 import os
 import requests
 from io import BytesIO
-from dotenv import load_dotenv
+import streamlit as st  # Add this import
 from openai import OpenAI
 from docx import Document
 
-load_dotenv()
-
-OPENAI_API_KEY = "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"
-PERPLEXITY_API_KEY = "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"
+# Load API keys from Streamlit Secrets (secure, never in GitHub)
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+PERPLEXITY_API_KEY = st.secrets["PERPLEXITY_API_KEY"]
 client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 # -------------------------
 # ChatGPT (Drafting)
@@ -21,7 +19,6 @@ def ask_chatgpt(prompt: str) -> str:
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
-
 
 # -------------------------
 # Perplexity (Case law research)
@@ -56,7 +53,6 @@ def ask_perplexity(prompt: str) -> str:
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
 
-
 # -------------------------
 # Summarize GST Notice
 # -------------------------
@@ -78,7 +74,6 @@ def summarize_notice(pdf_text: str) -> str:
     {pdf_text}
     """
     return ask_chatgpt(prompt)
-
 
 # -------------------------
 # Research using Perplexity
@@ -110,7 +105,6 @@ def research_support(instructions: str, notice_summary: str) -> str:
     Provide a structured research note with headings and bullet points.
     """
     return ask_perplexity(prompt)
-
 
 # -------------------------
 # Draft final document
@@ -145,7 +139,6 @@ def draft_final_document(instructions: str, notice_summary: str, research_note: 
     Draft the final document now.
     """
     return ask_chatgpt(prompt)
-
 
 # -------------------------
 # Word document export
