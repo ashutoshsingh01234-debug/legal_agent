@@ -1,0 +1,20 @@
+# Auto normalize line endings for all files
+* text=auto
+
+# Python files
+*.py text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+
+# Windows files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files
+*.pdf binary
+*.docx binary
+*.png binary
+*.jpg binary
+*.jpeg binary

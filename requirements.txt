@@ -1,9 +1,9 @@
 streamlit
 openai
 requests
-python-dotenv  # Remove if not using dotenv anymore
+python-dotenv
 python-docx
+pdfplumber
 pytesseract
 pillow
 pdf2image
-# Add any other packages from your app.py/pdf_utils.py
