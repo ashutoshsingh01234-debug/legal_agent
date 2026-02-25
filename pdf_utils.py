@@ -1,71 +1,84 @@
-import pdfplumber
-import pytesseract
-from pdf2image import convert_from_bytes
-
-# Set your Tesseract path (Windows only - comment out for Linux/Streamlit Cloud)
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Users\ashut\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+import fitz  # PyMuPDF
+import easyocr
+from io import BytesIO
 
 # Minimum characters required for valid text extraction
-MIN_TEXT_LENGTH = 50  # Lowered for scanned PDFs which may have less structured text
+MIN_TEXT_LENGTH = 50
+
+# Initialize OCR reader (lazy loading - will be created on first use)
+ocr_reader = None
+
+
+def get_ocr_reader():
+    """Lazy load OCR reader to avoid memory issues on startup"""
+    global ocr_reader
+    if ocr_reader is None:
+        ocr_reader = easyocr.Reader(['en'], verbose=False)
+    return ocr_reader
 
 
 def extract_text_from_pdf(file, use_ocr_first=False):
     """
     Extract text from a PDF using multiple strategies:
-    1. pdfplumber (pure Python, works everywhere - for text-based PDFs)
-    2. OCR fallback (pdf2image + pytesseract - for scanned PDFs, only if explicitly requested)
+    1. PyMuPDF (fitz) - Fast, reliable text extraction from text-based PDFs
+    2. EasyOCR - Modern OCR for scanned PDFs (pure Python, no system dependencies)
 
     Args:
         file: PDF file object
-        use_ocr_first: If True, skip pdfplumber and go straight to OCR (useful for known scanned documents)
+        use_ocr_first: If True, skip text extraction and go straight to OCR (for image PDFs)
 
     Returns:
         dict with keys:
             - 'success': bool indicating if extraction succeeded
             - 'text': extracted text or None
-            - 'method': 'pdfplumber', 'ocr', or None
+            - 'method': 'fitz', 'ocr', or None
             - 'error': error message if failed
     """
 
-    # Strategy 1: Try pdfplumber first (pure Python solution, works everywhere)
+    # Strategy 1: Try PyMuPDF (fitz) first for text extraction
     if not use_ocr_first:
         try:
             file.seek(0)
-            with pdfplumber.open(file) as pdf:
-                text = ""
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
+            pdf_bytes = BytesIO(file.read())
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-                text = text.strip()
-                if len(text) >= MIN_TEXT_LENGTH:
-                    return {
-                        'success': True,
-                        'text': text,
-                        'method': 'pdfplumber',
-                        'error': None
-                    }
-                # If pdfplumber extracted very little text and user didn't request OCR,
-                # return error suggesting they check the OCR checkbox
-                elif len(text) > 0:
-                    return {
-                        'success': False,
-                        'text': None,
-                        'method': None,
-                        'error': 'Very little text was extracted. This might be a scanned PDF.\n\n'
-                                'Try checking the "Force OCR processing" checkbox to extract text from scanned documents.'
-                    }
-                else:
-                    # No text extracted at all
-                    return {
-                        'success': False,
-                        'text': None,
-                        'method': None,
-                        'error': 'No text could be extracted from the PDF using standard methods.\n\n'
-                                'If this is a scanned PDF, try checking the "Force OCR processing" checkbox.\n'
-                                'Otherwise, the PDF may be corrupted or empty.'
-                    }
+            text = ""
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # Extract text with layout preservation
+                page_text = page.get_text()
+                if page_text:
+                    text += page_text + "\n"
+
+            text = text.strip()
+            pdf_document.close()
+
+            if len(text) >= MIN_TEXT_LENGTH:
+                return {
+                    'success': True,
+                    'text': text,
+                    'method': 'fitz',
+                    'error': None
+                }
+            # If very little text was extracted, suggest OCR
+            elif len(text) > 0:
+                return {
+                    'success': False,
+                    'text': None,
+                    'method': None,
+                    'error': 'Very little text was extracted. This might be a scanned PDF.\n\n'
+                            'Try checking the "Force OCR processing" checkbox to extract text from scanned documents.'
+                }
+            else:
+                # No text extracted at all
+                return {
+                    'success': False,
+                    'text': None,
+                    'method': None,
+                    'error': 'No text could be extracted from the PDF using standard methods.\n\n'
+                            'If this is a scanned PDF, try checking the "Force OCR processing" checkbox.\n'
+                            'Otherwise, the PDF may be corrupted or empty.'
+                }
 
         except Exception as e:
             return {
@@ -75,22 +88,36 @@ def extract_text_from_pdf(file, use_ocr_first=False):
                 'error': f'Could not read PDF file: {str(e)}\n\nPlease check that the file is a valid PDF.'
             }
 
-    # Strategy 2: OCR for scanned images (ONLY if explicitly requested via use_ocr_first=True)
+    # Strategy 2: OCR for scanned images (only if explicitly requested via use_ocr_first=True)
     if use_ocr_first:
         try:
             file.seek(0)
-            images = convert_from_bytes(file.read(), dpi=300)  # Higher DPI for better OCR accuracy
+            pdf_bytes = BytesIO(file.read())
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
 
             ocr_text = ""
-            for page_num, img in enumerate(images):
-                # Apply OCR with English language support
-                # For Indian legal documents, you could add 'hin' for Hindi if needed
-                page_text = pytesseract.image_to_string(img, lang="eng")
+            reader = get_ocr_reader()
 
-                if page_text.strip():
-                    ocr_text += page_text + "\n"
+            # Process each page with OCR
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # Render page to image at high DPI for better OCR
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better accuracy
+                image_data = pix.tobytes("ppm")
+
+                # Run OCR on the page image
+                try:
+                    result = reader.readtext(pix.tobytes("ppm"), detail=0)
+                    if result:
+                        page_text = "\n".join(result)
+                        if page_text.strip():
+                            ocr_text += page_text + "\n"
+                except Exception as ocr_error:
+                    # Single page OCR failed, continue with next page
+                    continue
 
             ocr_text = ocr_text.strip()
+            pdf_document.close()
 
             if len(ocr_text) >= MIN_TEXT_LENGTH:
                 return {
@@ -113,37 +140,9 @@ def extract_text_from_pdf(file, use_ocr_first=False):
                 }
 
         except Exception as e:
-            error_msg = str(e).lower()
-
-            # Provide specific error message based on exception type
-            if 'poppler' in error_msg or 'page count' in error_msg:
-                return {
-                    'success': False,
-                    'text': None,
-                    'method': None,
-                    'error': 'Poppler is not installed, which is required for OCR processing.\n\n'
-                            'To use OCR for scanned PDFs:\n\n'
-                            '**Option A (Recommended):** Install via Chocolatey:\n'
-                            '`choco install poppler`\n\n'
-                            '**Option B (Manual):** Download from:\n'
-                            'https://github.com/oschwartz10612/poppler-windows/releases/\n'
-                            'Extract and add to Windows PATH.\n\n'
-                            'After installing, restart your IDE and try again.'
-                }
-            elif 'tesseract' in error_msg or 'tesseract is not installed' in error_msg:
-                return {
-                    'success': False,
-                    'text': None,
-                    'method': None,
-                    'error': 'OCR engine (Tesseract) is not properly installed. '
-                            'Please reinstall from: https://github.com/UB-Mannheim/tesseract/wiki'
-                }
-            else:
-                return {
-                    'success': False,
-                    'text': None,
-                    'method': None,
-                    'error': f'Error processing PDF: {str(e)}'
-                }
-
-
+            return {
+                'success': False,
+                'text': None,
+                'method': None,
+                'error': f'Error processing PDF with OCR: {str(e)}\n\nPlease try uploading a different file or use manual text input.'
+            }

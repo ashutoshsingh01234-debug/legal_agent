@@ -86,10 +86,10 @@ with tab1:
 
             if extraction_result['success']:
                 st.session_state.pdf_text = extraction_result['text']
-                if extraction_result['method'] == 'pdfplumber':
-                    method_text = "pdfplumber (instant extraction)"
+                if extraction_result['method'] == 'fitz':
+                    method_text = "PyMuPDF (text extraction)"
                 elif extraction_result['method'] == 'ocr':
-                    method_text = "OCR (Optical Character Recognition)"
+                    method_text = "EasyOCR (scanned document recognition)"
                 else:
                     method_text = "text extraction"
                 st.success(f"✓ Text extracted successfully\n**Method:** {method_text}")
