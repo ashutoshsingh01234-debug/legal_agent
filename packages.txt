@@ -1,1 +1,0 @@
-# No system-level packages required - using pure Python libraries (PyMuPDF, EasyOCR)
