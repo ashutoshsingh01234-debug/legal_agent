@@ -6,4 +6,5 @@ python-docx
 PyMuPDF
 easyocr
 pillow
-
+torch
+torchvision
