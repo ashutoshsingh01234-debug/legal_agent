@@ -6,8 +6,15 @@ from openai import OpenAI
 from docx import Document
 
 # Load API keys from Streamlit Secrets (secure, never in GitHub)
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-PERPLEXITY_API_KEY = st.secrets.get("PERPLEXITY_API_KEY") or os.getenv("PERPLEXITY_API_KEY")
+try:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+except (KeyError, FileNotFoundError):
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+try:
+    PERPLEXITY_API_KEY = st.secrets["PERPLEXITY_API_KEY"]
+except (KeyError, FileNotFoundError):
+    PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -------------------------
