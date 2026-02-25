@@ -1,10 +1,9 @@
 import pdfplumber
 import pytesseract
 from pdf2image import convert_from_bytes
-from pypdf import PdfReader
 
-# Set your Tesseract path
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\ashut\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+# Set your Tesseract path (Windows only - comment out for Linux/Streamlit Cloud)
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Users\ashut\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 # Minimum characters required for valid text extraction
 MIN_TEXT_LENGTH = 50  # Lowered for scanned PDFs which may have less structured text
